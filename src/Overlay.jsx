@@ -43,7 +43,8 @@ export default function Overlay({ item, selected, onSelect, onChange, onDelete, 
     })
   }
 
-  const textSize = `${item.fontSize / pageSize.w * 100}cqw`
+  // Scale down with a narrow viewport, while keeping the original desktop size.
+  const textSize = `min(${item.fontSize / pageSize.w * 100}vw, ${item.fontSize}px)`
   const style = { left: `${item.x / pageSize.w * 100}%`, top: `${item.y / pageSize.h * 100}%`, opacity: item.opacity }
   if (item.type === 'image') { style.width = `${item.w / pageSize.w * 100}%`, style.height = `${item.h / pageSize.h * 100}%` }
 

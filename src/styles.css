@@ -13,7 +13,7 @@ body { margin: 0; font-family: system-ui, sans-serif; background: #e9ecef; }
 .props input[type=number] { width: 60px; }
 .pages { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
 .empty { margin-top: 80px; color: #666; }
-.page { position: relative; box-shadow: 0 2px 10px rgba(0,0,0,.25); background: #fff; flex: none; max-width: 100%; container-type: inline-size; }
+.page { position: relative; box-shadow: 0 2px 10px rgba(0,0,0,.25); background: #fff; flex: none; max-width: 100%; }
 .page canvas { display: block; max-width: 100%; height: auto; }
 .overlay { position: absolute; cursor: move; touch-action: none; user-select: none; }
 .overlay.selected { outline: 2px dashed #2563eb; }

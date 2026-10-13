@@ -28,21 +28,24 @@ export default function Overlay({ item, selected, onSelect, onChange, onDelete, 
     onSelect()
     const sx = e.clientX, sy = e.clientY, ox = item.x, oy = item.y
     const box = e.currentTarget.getBoundingClientRect()
-    track((ev) => onChange(clamp(ox + ev.clientX - sx, oy + ev.clientY - sy, box.width, box.height)))
+    const pageScale = e.currentTarget.parentElement.getBoundingClientRect().width / pageSize.w
+    track((ev) => onChange(clamp(ox + (ev.clientX - sx) / pageScale, oy + (ev.clientY - sy) / pageScale, box.width / pageScale, box.height / pageScale)))
   }
 
   const startResize = (e) => {
     e.stopPropagation()
     e.preventDefault()
     const sx = e.clientX, ow = item.w, ratio = item.h / item.w
+    const pageScale = e.currentTarget.parentElement.getBoundingClientRect().width / pageSize.w
     track((ev) => {
-      const w = Math.max(20, Math.min(ow + ev.clientX - sx, pageSize.w - item.x))
+      const w = Math.max(20, Math.min(ow + (ev.clientX - sx) / pageScale, pageSize.w - item.x))
       onChange({ w, h: w * ratio })
     })
   }
 
-  const style = { left: item.x, top: item.y, opacity: item.opacity }
-  if (item.type === 'image') { style.width = item.w; style.height = item.h }
+  const textSize = `${item.fontSize / pageSize.w * 100}cqw`
+  const style = { left: `${item.x / pageSize.w * 100}%`, top: `${item.y / pageSize.h * 100}%`, opacity: item.opacity }
+  if (item.type === 'image') { style.width = `${item.w / pageSize.w * 100}%`, style.height = `${item.h / pageSize.h * 100}%` }
 
   const lines = item.text?.split('\n') ?? []
 
@@ -62,13 +65,13 @@ export default function Overlay({ item, selected, onSelect, onChange, onDelete, 
           value={item.text}
           rows={lines.length}
           cols={Math.max(4, ...lines.map((l) => l.length)) + 1}
-          style={{ fontSize: item.fontSize, color: item.color, lineHeight: 1.2 }}
+          style={{ fontSize: textSize, color: item.color, lineHeight: 1.2 }}
           onChange={(e) => onChange({ text: e.target.value })}
           onPointerDown={(e) => e.stopPropagation()}
           onBlur={() => setEditing(false)}
         />
       ) : (
-        <div className="text-view" style={{ fontSize: item.fontSize, color: item.color, lineHeight: 1.2 }}>
+        <div className="text-view" style={{ fontSize: textSize, color: item.color, lineHeight: 1.2 }}>
           {item.text || ' '}
         </div>
       )}

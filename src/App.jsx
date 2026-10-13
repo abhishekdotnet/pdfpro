@@ -23,6 +23,7 @@ export default function App() {
   const pagesRef = useRef(null)
 
   const sel = items.find((i) => i.id === selId)
+  const currentSize = sizes[curPage] || { w: 600, h: 800 }
 
   const loadPdf = async (file) => {
     if (!file) return
@@ -39,17 +40,27 @@ export default function App() {
   )
 
   const update = (id, patch) => setItems((arr) => arr.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+  // Geometry is kept as a fraction of a page, so one annotation can be used
+  // on every page even when individual page dimensions differ.
+  const updateLayout = (id, patch, pageSize) => {
+    const next = { ...patch }
+    if ('x' in next) { next.xRatio = next.x / pageSize.w; delete next.x }
+    if ('y' in next) { next.yRatio = next.y / pageSize.h; delete next.y }
+    if ('w' in next) { next.wRatio = next.w / pageSize.w; delete next.w }
+    if ('h' in next) { next.hRatio = next.h / pageSize.h; delete next.h }
+    update(id, next)
+  }
   const remove = (id) => { setItems((arr) => arr.filter((i) => i.id !== id)); setSelId(null) }
 
   const add = (item) => {
     const id = uid++
-    setItems((arr) => [...arr, { id, page: curPage, opacity: 1, ...item }])
+    setItems((arr) => [...arr, { id, opacity: 1, ...item }])
     setSelId(id)
   }
 
   const addText = () => {
-    const s = sizes[curPage] || { w: 600, h: 800 }
-    add({ type: 'text', text: 'Double-click to edit', x: s.w / 2 - 100, y: s.h / 2, fontSize: 24, color: '#000000' })
+    const s = currentSize
+    add({ type: 'text', text: 'Double-click to edit', xRatio: .5 - 100 / s.w, yRatio: .5, fontRatio: 24 / s.w, color: '#000000' })
   }
 
   const addImage = async (file) => {
@@ -58,16 +69,16 @@ export default function App() {
     const img = new Image()
     img.src = src
     await img.decode()
-    const s = sizes[curPage] || { w: 600, h: 800 }
+    const s = currentSize
     const w = Math.min(200, s.w * 0.4)
     const h = w * (img.naturalHeight / img.naturalWidth)
-    add({ type: 'image', src, mime: file.type, x: s.w / 2 - w / 2, y: s.h / 2 - h / 2, w, h })
+    add({ type: 'image', src, mime: file.type, xRatio: .5 - w / s.w / 2, yRatio: .5 - h / s.h / 2, wRatio: w / s.w, hRatio: h / s.h })
   }
 
   const download = async () => {
     setBusy(true)
     try {
-      const out = await exportPdf(bytes, items, SCALE)
+      const out = await exportPdf(bytes, items)
       const a = document.createElement('a')
       a.href = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }))
       a.download = name.replace(/\.pdf$/i, '') + '-edited.pdf'
@@ -101,7 +112,7 @@ export default function App() {
         <button className="btn" disabled={!pdf} onClick={() => imgInput.current.click()}>+ Image</button>
         <input ref={imgInput} type="file" accept="image/*" hidden
           onChange={(e) => { addImage(e.target.files[0]); e.target.value = '' }} />
-        {pdf && <span className="muted">Adding to page {curPage + 1} / {pdf.numPages}</span>}
+        {pdf && <span className="muted">Adding to all {pdf.numPages} pages · editing from page {curPage + 1}</span>}
 
         {sel && (
           <div className="props">
@@ -113,8 +124,8 @@ export default function App() {
             {sel.type === 'text' && (
               <>
                 <label>Size
-                  <input type="number" min="6" max="200" value={Math.round(sel.fontSize / SCALE)}
-                    onChange={(e) => update(sel.id, { fontSize: Math.max(6, +e.target.value) * SCALE })} />
+                  <input type="number" min="6" max="200" value={Math.round(sel.fontRatio * currentSize.w / SCALE)}
+                    onChange={(e) => update(sel.id, { fontRatio: Math.max(6, +e.target.value) * SCALE / currentSize.w })} />
                 </label>
                 <label>Color
                   <input type="color" value={sel.color} onChange={(e) => update(sel.id, { color: e.target.value })} />
@@ -131,15 +142,24 @@ export default function App() {
       </header>
 
       <main className="pages" ref={pagesRef} onScroll={onScroll} onPointerDown={() => setSelId(null)}>
-        {!pdf && <div className="empty">Open a PDF, then add text or images and drag them anywhere on the page.</div>}
+        {!pdf && <div className="empty">Open a PDF, then add text or images. Each item is automatically placed on every page.</div>}
         {pdf && Array.from({ length: pdf.numPages }, (_, i) => (
           <PdfPage key={name + i} pdf={pdf} pageIndex={i} scale={SCALE} onSize={onSize}>
-            {sizes[i] && items.filter((it) => it.page === i).map((it) => (
-              <Overlay key={it.id} item={it} pageSize={sizes[i]} selected={it.id === selId}
+            {sizes[i] && items.map((it) => {
+              const s = sizes[i]
+              const positioned = {
+                ...it,
+                x: it.xRatio * s.w,
+                y: it.yRatio * s.h,
+                ...(it.type === 'image'
+                  ? { w: it.wRatio * s.w, h: it.hRatio * s.h }
+                  : { fontSize: it.fontRatio * s.w }),
+              }
+              return <Overlay key={it.id} item={positioned} pageSize={s} selected={it.id === selId}
                 onSelect={() => setSelId(it.id)}
-                onChange={(p) => update(it.id, p)}
+                onChange={(p) => updateLayout(it.id, p, s)}
                 onDelete={() => remove(it.id)} />
-            ))}
+            })}
           </PdfPage>
         ))}
       </main>

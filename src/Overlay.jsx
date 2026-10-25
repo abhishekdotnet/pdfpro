@@ -13,23 +13,35 @@ export default function Overlay({ item, selected, onSelect, onChange, onDelete, 
     y: Math.min(Math.max(0, y), Math.max(0, pageSize.h - h)),
   })
 
-  const track = (move) => {
+  const track = (move, onUp) => {
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      onUp?.()
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
   }
 
   const startDrag = (e) => {
     if (editing) return
     e.stopPropagation()
+    const wasSelected = selected
+    let moved = false
     onSelect()
     const sx = e.clientX, sy = e.clientY, ox = item.x, oy = item.y
     const box = e.currentTarget.getBoundingClientRect()
     const pageScale = e.currentTarget.parentElement.getBoundingClientRect().width / pageSize.w
-    track((ev) => onChange(clamp(ox + (ev.clientX - sx) / pageScale, oy + (ev.clientY - sy) / pageScale, box.width / pageScale, box.height / pageScale)))
+    track((ev) => {
+      if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 6) return
+      moved = true
+      onChange(clamp(ox + (ev.clientX - sx) / pageScale, oy + (ev.clientY - sy) / pageScale, box.width / pageScale, box.height / pageScale))
+    }, () => {
+      // Tapping an already-selected text edits it (double-click doesn't exist on touch).
+      if (!moved && wasSelected && item.type === 'text') setEditing(true)
+    })
   }
 
   const startResize = (e) => {
@@ -43,8 +55,8 @@ export default function Overlay({ item, selected, onSelect, onChange, onDelete, 
     })
   }
 
-  // Scale down with a narrow viewport, while keeping the original desktop size.
-  const textSize = `min(${item.fontSize / pageSize.w * 100}vw, ${item.fontSize}px)`
+  // Relative to the page element's rendered width, so text scales with the page.
+  const textSize = `${item.fontSize / pageSize.w * 100}cqw`
   const style = { left: `${item.x / pageSize.w * 100}%`, top: `${item.y / pageSize.h * 100}%`, opacity: item.opacity }
   if (item.type === 'image') { style.width = `${item.w / pageSize.w * 100}%`, style.height = `${item.h / pageSize.h * 100}%` }
 
